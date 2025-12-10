@@ -4,7 +4,7 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
-    ansiColor('xterm')
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm'])
   }
 
   environment {
