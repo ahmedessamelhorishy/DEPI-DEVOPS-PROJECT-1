@@ -8,6 +8,9 @@ pipeline {
   }
 
   environment {
+    AWS_ACCESS_KEY_ID     = credentials('aws-creds-id')
+    AWS_SECRET_ACCESS_KEY = credentials('aws-creds-id')
+
     GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
     GITHUB_REPO       = "${env.GITHUB_REPO}"
     AWS_REGION        = "${env.AWS_REGION}"
@@ -31,10 +34,7 @@ pipeline {
 
     stage('AWS EKS connect') {
       steps {
-        withCredentials([aws(credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')])
-        {
         sh 'set -e; aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
-        }
       }
     }
 
