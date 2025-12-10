@@ -4,7 +4,7 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
-    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm'])
+    ansiColor('xterm')
   }
 
   environment {
@@ -21,6 +21,12 @@ pipeline {
   }
 
   triggers { githubPush() }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+  }
 
   stages {
     stage('Checkout') {
