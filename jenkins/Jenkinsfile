@@ -12,7 +12,6 @@ pipeline {
     AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
 
     NEXUS_CREDS = credentials('nexus-creds')
-    NEXUS_CREDS = credentials('nexus-creds')
 
     GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
     GITHUB_REPO       = "${env.GITHUB_REPO}"
