@@ -11,15 +11,16 @@ pipeline {
     AWS_ACCESS_KEY_ID     = credentials('aws-creds')
     AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
 
-    NEXUS_USER = credentials('nexus-creds', variable: 'username')
-    NEXUS_PASS = credentials('nexus-creds', variable: 'password')
+    NEXUS_CREDS = credentials('nexus-creds')
+    NEXUS_CREDS = credentials('nexus-creds')
 
     GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
     GITHUB_REPO       = "${env.GITHUB_REPO}"
     AWS_REGION        = "${env.AWS_REGION}"
     EKS_CLUSTER_NAME  = "${env.EKS_CLUSTER_NAME}"
     K8S_NAMESPACE     = "${env.K8S_NAMESPACE}"
-    NEXUS_REGISTRY     = "${env.NEXUS_REGISTRY}"
+    NEXUS_HOST        = "${env.NEXUS_HOST}"
+    NEXUS_REGISTRY    = "${env.NEXUS_REGISTRY}"
 
     FRONTEND_TAG      = "${env.NEXUS_REGISTRY}:frontend-${env.BUILD_NUMBER}"
     BACKEND_TAG       = "${env.NEXUS_REGISTRY}:backend-${env.BUILD_NUMBER}"
@@ -52,7 +53,7 @@ pipeline {
       steps {
         sh '''
           set -e
-          docker login ${NEXUS_REGISTRY} -u "$NEXUS_USER" -p "$NEXUS_PASS"
+          docker login ${NNEXUS_HOST} -u "$NEXUS_CREDS_USR" -p "$NEXUS_CREDS_PSW"
         '''
       }
     }
@@ -100,8 +101,8 @@ pipeline {
           set -e
           kubectl -n "$K8S_NAMESPACE" create secret docker-registry nexus-secret \
             --docker-server="${NEXUS_REGISTRY}" \
-            --docker-username="${NEXUS_USER}" \
-            --docker-password="${NEXUS_PASS}" \
+            --docker-username="${NEXUS_CREDS_USR}" \
+            --docker-password="${NEXUS_CREDS_PSW}" \
             --docker-email="a.e.n@gmail.com" \
             --dry-run=client -o yaml | kubectl apply -f -
         '''
