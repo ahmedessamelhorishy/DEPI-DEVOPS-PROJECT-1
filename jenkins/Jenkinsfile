@@ -57,6 +57,9 @@ pipeline {
     }
 
     stage('Push DB image to Nexus (one-time)') {
+      when {
+        changeset "app/database/**"
+      }
       steps {
         sh '''
           set -e
@@ -72,22 +75,33 @@ pipeline {
       }
     }
 
-    stage('Build, tag & push frontend/backend') {
+    stage('Build, tag & push frontend') {
+      when {
+        changeset "app/frontend/**"
+      }
       steps {
         sh '''
           set -e
           docker build -t frontend:build ./app/frontend
-          docker build -t backend:build ./app/backend
-
           docker tag frontend:build "${FRONTEND_TAG}"
-          docker tag backend:build "${BACKEND_TAG}"
-
           docker tag frontend:build "$NEXUS_REGISTRY:frontend-latest"
-          docker tag backend:build "$NEXUS_REGISTRY:backend-latest"
-
           docker push "${FRONTEND_TAG}"
-          docker push "${BACKEND_TAG}"
           docker push "$NEXUS_REGISTRY:frontend-latest"
+        '''
+      }
+    }
+
+    stage('Build, tag & push backend') {
+      when {
+        changeset "app/backend/**"
+      }
+      steps {
+        sh '''
+          set -e
+          docker build -t backend:build ./app/backend
+          docker tag backend:build "${BACKEND_TAG}"
+          docker tag backend:build "$NEXUS_REGISTRY:backend-latest"
+          docker push "${BACKEND_TAG}"
           docker push "$NEXUS_REGISTRY:backend-latest"
         '''
       }
@@ -108,6 +122,14 @@ pipeline {
     }
 
     stage('Deploy to Kubernetes') {
+      when {
+        anyOf {
+          changeset "k8s/**"
+          changeset "app/frontend/**"
+          changeset "app/backend/**"
+          changeset "app/database/**"
+        }
+      }
       steps {
         sh '''
           set -e
@@ -136,6 +158,13 @@ pipeline {
     }
     failure {
       echo 'Pipeline failed.'
+    }
+    always {
+      echo 'Cleanup'
+      sh '''
+        set -e
+        docker image prune -f
+      '''
     }
   }
 }
