@@ -52,7 +52,7 @@ pipeline {
       steps {
         sh '''
           set -e
-          docker login ${NNEXUS_HOST} -u "$NEXUS_CREDS_USR" -p "$NEXUS_CREDS_PSW"
+          docker login ${NEXUS_HOST} -u "$NEXUS_CREDS_USR" -p "$NEXUS_CREDS_PSW"
         '''
       }
     }
