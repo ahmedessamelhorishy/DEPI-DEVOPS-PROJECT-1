@@ -2,7 +2,7 @@
 
 ## Index
 
-- [Tools & Code Files Structure Preparation](#1--tools--code-files-structure-prepartion)
+- [Tools & Code Files Structure Preparation](#1--tools--code-files-structure-preparation)
 - [Local Development & Testing](#2--local-development--testing)
 - [Terraform](#3--terraform)
 - [Ansible](#4--ansible)
@@ -673,8 +673,6 @@ Configure the global credentials 'aws-creds' (from Section 1) & 'nexus-creds'(fr
 ![](images/Jenkins14.PNG)
 
 Configure the below global environment variables from: **Settings -> System Configuration -> Global properties -> Environment variables**
-![](images/Jenkins15.PNG)
-![](images/Jenkins16.PNG)
 ```
 GITHUB_USERNAME 'ahmedessamelhorishy' (from Section 1)
 GITHUB_REPO 'DevOps-Graduation-Project' (from Section 1)
@@ -685,6 +683,9 @@ ECR_PUBLIC_URI (from Section 3, skip if chose to use Nexus)
 NEXUS_HOST 'http://<tools_public_ip>:5000' (from Section 5, skip if chose to use ECR) 
 NEXUS_REGISTRY <tools_public_ip>:5000/repository/docker-hosted (from Section 5, skip if chose to use ECR) 
 ```
+![](images/Jenkins15.PNG)
+![](images/Jenkins16.PNG)
+
 Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile' from: **New Item**
 ![](images/Jenkins17.PNG)
 ![](images/Jenkins18.PNG)
