@@ -686,7 +686,7 @@ NEXUS_REGISTRY <tools_public_ip>:5000/repository/docker-hosted (from Section 5, 
 ![](images/Jenkins15.PNG)
 ![](images/Jenkins16.PNG)
 
-Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile' from: **New Item**
+Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile' (if chose to use **Nexus**) OR 'jenkins/Jenkinsfile (ECR)' (if chose to use **ECR**)  from: **New Item**
 ![](images/Jenkins17.PNG)
 ![](images/Jenkins18.PNG)
 ![](images/Jenkins19.PNG)
