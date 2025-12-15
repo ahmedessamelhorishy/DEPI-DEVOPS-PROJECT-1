@@ -1,0 +1,124 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    ansiColor('xterm')
+  }
+
+  environment {
+    AWS_ACCESS_KEY_ID     = credentials('aws-creds')
+    AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
+
+    GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
+    GITHUB_REPO       = "${env.GITHUB_REPO}"
+    AWS_REGION        = "${env.AWS_REGION}"
+    EKS_CLUSTER_NAME  = "${env.EKS_CLUSTER_NAME}"
+    K8S_NAMESPACE     = "${env.K8S_NAMESPACE}"
+    ECR_PUBLIC_URI    = "${env.ECR_PUBLIC_URI}"
+
+    FRONTEND_TAG      = "${env.ECR_PUBLIC_URI}:frontend-${env.BUILD_NUMBER}"
+    BACKEND_TAG       = "${env.ECR_PUBLIC_URI}:backend-${env.BUILD_NUMBER}"
+    DB_TAG            = "${env.ECR_PUBLIC_URI}:postgres-15"
+  }
+
+  triggers { githubPush() }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
+      }
+    }
+
+    stage('AWS EKS connect') {
+      steps {
+        sh 'set -e; aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
+      }
+    }
+
+    stage('Create k8 namespace') {
+      steps {
+        sh 'set -e; kubectl create ns "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -'
+      }
+    }
+
+    stage('Docker login to ECR') {
+      steps {
+        sh 'set -e; aws ecr-public get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin public.ecr.aws'
+      }
+    }
+
+    stage('Push DB image to ECR (one-time)') {
+      steps {
+        sh '''
+          set -e
+          REPO_NAME=$(echo "$ECR_PUBLIC_URI" | cut -d/ -f3)
+          if aws ecr-public describe-images --repository-name "$REPO_NAME" \
+               --region "$AWS_REGION" \
+               --image-ids imageTag=postgres-15 >/dev/null 2>&1; then
+            echo "DB image already exists in ECR: $DB_TAG"
+          else
+            echo "Pushing DB image to ECR for the first time"
+            docker pull postgres:15
+            docker tag postgres:15 "$DB_TAG"
+            docker push "$DB_TAG"
+          fi
+        '''
+      }
+    }
+
+    stage('Build, tag & push frontend/backend') {
+      steps {
+        sh '''
+          set -e
+          docker build -t frontend:build ./app/frontend
+          docker build -t backend:build ./app/backend
+
+          docker tag frontend:build "$FRONTEND_TAG"
+          docker tag backend:build "$BACKEND_TAG"
+
+          docker tag frontend:build "$ECR_PUBLIC_URI:frontend-latest"
+          docker tag backend:build "$ECR_PUBLIC_URI:backend-latest"
+
+          docker push "$FRONTEND_TAG"
+          docker push "$BACKEND_TAG"
+          docker push "$ECR_PUBLIC_URI:frontend-latest"
+          docker push "$ECR_PUBLIC_URI:backend-latest"
+        '''
+      }
+    }
+
+    stage('Deploy to Kubernetes') {
+      steps {
+        sh '''
+          set -e
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/frontend-service.yaml
+
+          export FRONTEND_TAG BACKEND_TAG DB_TAG
+
+          envsubst < k8s/db-deployment.yaml       | kubectl -n "$K8S_NAMESPACE" apply -f -
+          envsubst < k8s/backend-deployment.yaml  | kubectl -n "$K8S_NAMESPACE" apply -f -
+          envsubst < k8s/frontend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/db
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+    }
+    failure {
+      echo 'Pipeline failed.'
+    }
+  }
+}

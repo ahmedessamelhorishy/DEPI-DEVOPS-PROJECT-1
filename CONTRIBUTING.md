@@ -1,10 +1,3 @@
----
-
-### 2. CONTRIBUTING.md
-
-This file outlines the standards for titles, branching, and commit messages to keep the repository clean.
-
-```markdown
 # Contributing to Infrastructure Pipeline
 
 We welcome contributions! Please follow the guidelines below to ensure a smooth workflow for the DevOps team.
