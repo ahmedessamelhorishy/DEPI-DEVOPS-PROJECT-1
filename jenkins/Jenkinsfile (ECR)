@@ -23,28 +23,31 @@ pipeline {
   triggers { githubPush() }
 
   stages {
-    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-
-      stage('Checkout') {
-        steps {
-          git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
-        }
+    stage('Checkout') {
+      steps {
+        git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
       }
+    }
 
-      stage('AWS EKS connect') {
-        steps {
+    stage('AWS EKS connect') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh 'set -e; aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
         }
       }
+    }
 
-      stage('Create k8 namespace') {
-        steps {
+    stage('Create k8 namespace') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh 'set -e; kubectl create ns "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -'
         }
       }
+    }
 
-      stage('Docker login to ECR') {
-        steps {
+    stage('Docker login to ECR') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             aws ecr get-login-password --region "$AWS_REGION" \
@@ -52,15 +55,17 @@ pipeline {
           '''
         }
       }
+    }
 
-      stage('Push DB image to ECR (one-time)') {
-        when {
-          anyOf {
-            changeset "app/database/**"
-            triggeredBy 'ManualTriggerCause'
-          }
+    stage('Push DB image to ECR (one-time)') {
+      when {
+        anyOf {
+          changeset "app/database/**"
+          triggeredBy 'ManualTriggerCause'
         }
-        steps {
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             if docker pull "${DB_TAG}" >/dev/null 2>&1; then
@@ -74,15 +79,17 @@ pipeline {
           '''
         }
       }
+    }
 
-      stage('Build, tag & push frontend') {
-        when {
-          anyOf {
-            changeset "app/frontend/**"
-            triggeredBy 'ManualTriggerCause'
-          }
+    stage('Build, tag & push frontend') {
+      when {
+        anyOf {
+          changeset "app/frontend/**"
+          triggeredBy 'ManualTriggerCause'
         }
-        steps {
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             docker build -t frontend:build ./app/frontend
@@ -93,15 +100,17 @@ pipeline {
           '''
         }
       }
+    }
 
-      stage('Build, tag & push backend') {
-        when {
-          anyOf {
-            changeset "app/backend/**"
-            triggeredBy 'ManualTriggerCause'
-          }
+    stage('Build, tag & push backend') {
+      when {
+        anyOf {
+          changeset "app/backend/**"
+          triggeredBy 'ManualTriggerCause'
         }
-        steps {
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             docker build -t backend:build ./app/backend
@@ -112,9 +121,11 @@ pipeline {
           '''
         }
       }
+    }
 
-      stage('Create Secret in Kubernetes for ECR') {
-        steps {
+    stage('Create Secret in Kubernetes for ECR') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
@@ -126,18 +137,20 @@ pipeline {
           '''
         }
       }
+    }
 
-      stage('Deploy to Kubernetes') {
-        when {
-          anyOf {
-            changeset "k8s/**"
-            changeset "app/frontend/**"
-            changeset "app/backend/**"
-            changeset "app/database/**"
-            triggeredBy 'ManualTriggerCause'
-          }
+    stage('Deploy to Kubernetes') {
+      when {
+        anyOf {
+          changeset "k8s/**"
+          changeset "app/frontend/**"
+          changeset "app/backend/**"
+          changeset "app/database/**"
+          triggeredBy 'ManualTriggerCause'
         }
-        steps {
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
             kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
@@ -162,7 +175,9 @@ pipeline {
 
   post {
     success {
-      sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+      withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+      }
     }
     failure {
       echo 'Pipeline failed.'
