@@ -13,7 +13,7 @@ spec:
         app: backend
     spec:
       imagePullSecrets: 
-      - name: nexus-secret
+      - name: cr-secret
       containers:
       - name: backend
         image: ${BACKEND_TAG} # backend:latest

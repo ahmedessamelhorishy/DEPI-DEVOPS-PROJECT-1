@@ -13,7 +13,7 @@ spec:
         app: db
     spec:
       imagePullSecrets: 
-        - name: nexus-secret
+      - name: cr-secret
       containers:
       - name: db
         image: ${DB_TAG} # postgres:15

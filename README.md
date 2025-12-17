@@ -303,7 +303,7 @@ Verify
 $ docker ps  
 ```
 
-*** **From any browser** ***
+*** **From Any Browser** ***
 
 Open the app frontend webpage: **http://localhost:3000**  
 ![](images/Docker1.PNG)
@@ -321,7 +321,10 @@ Cleanup
 ```bash
 $ docker stop frontend backend db  
 $ docker rm frontend backend db  
-$ docker network rm my-app-net  
+$ docker network rm my-app-net
+$ docker rmi frontend:latest
+$ docker rmi backend:latest
+$ docker rmi postgres:15
 ```
 ---
 
@@ -334,14 +337,16 @@ $ docker network rm my-app-net
 **Docker Compose** build & test  
 ```bash
 $ docker compose up --build  
-```
+```  
+
+*** **From Another WSL Terminal** ***
 
 Verify  
 ```bash
 $ docker ps  
 ```
 
-*** **From any browser** ***
+*** **From Any Browser** ***
 
 Open the app frontend: **http://localhost:3000** 
 
@@ -400,7 +405,7 @@ Verify
 $ kubectl get all -n devops
 ```
 
-*** **From any browser** ***
+*** **From Any Browser** ***
 
 Open the app frontend: **http://localhost:3000**
 
@@ -409,12 +414,15 @@ Cleanup
 ```bash
 $ kubectl delete -f k8s/ -n devops
 $ kubectl delete namespace devops
+$ docker rmi frontend:latest
+$ docker rmi backend:latest
+$ docker rmi postgres:15
 ```
 
 
 ## 3- Terraform:
 
-*Configuring: **AWS EC2** instance + **ECR** public repository + **EKS** cluster + **VPC** services*
+*Configuring: **AWS EC2** instance + **ECR** private repository + **EKS** cluster + **VPC** services*
 
 ***Notes:*** 
 
@@ -422,7 +430,24 @@ a- Check the supported **EC2** instance types for the AWS Free Tier account
 ```bash
 $ aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true --query "InstanceTypes[*].InstanceType" --output text
 ```
-b- **ECR** is a container registry option (Skip **ECR** if chose to use **Nexus**)
+b- **ECR** is a container registry option (Skip **ECR** if chose to use **Nexus** by removing the 'modules/ecr' directory & below blocks):
+
+main.tf
+```
+}
+
+module "ecr" {
+  source       = "./modules/ecr"
+  project_name = var.project_name
+}
+```  
+
+outputs.tf
+```
+output "ecr_repository_url" {
+  value = module.ecr.repository_url
+}
+```
 
 c- Terraform variables
 ```
@@ -485,7 +510,10 @@ $ rm terraform.tfstate
 $ rm terraform.tfstate.backup
 $ rm tfdestroyplan
 $ rm tfplan
+$ rm ~/.kube/config
+$ cp ~/.kube/config.bak ~/.kube/config
 ```
+
 
 
 ## 4- Ansible:
@@ -496,7 +524,18 @@ $ rm tfplan
 
 a- **Git** (Already exist on Ubuntu OS)
 
-b- **Nexus** is a container registry option (Skip **Nexus** if chose to use **ECR**)
+b- **Nexus** is a container registry option (Skip **Nexus** if chose to use **ECR** by removing the 'nexus' directory & below line):  
+
+playbook.yaml
+```
+    - nexus
+```  
+
+c- Update the inventory.ini file with the tools public ip
+
+```
+<tools_public_ip> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_ed25519
+```
 
 ### Steps:
 
@@ -508,7 +547,7 @@ $ cd ~/devops/ansible
 $ ansible-playbook -i inventory.ini playbook.yaml --syntax-check
 ```
 
-Run the dry check
+Run the dry check (expected to fail at the task 'Install Docker engine')
 ```bash
 $ ansible-playbook -i inventory.ini playbook.yaml --check --diff
 ```
@@ -529,11 +568,16 @@ $ jenkins --version
 $ opt/nexus/bin/nexus --version
 ```
 
-*** **From any browser** ***
+*** **From Any Browser** ***
 
 Open Jenkins webpage: **http://<tools_public_ip>:8080**  
 
-Open Nexus webpage: **http://<tools_public_ip>:8081**
+Open Nexus webpage: **http://<tools_public_ip>:8081**  
+
+Cleanup
+```bash
+$ ansible-playbook -i inventory.ini uninstall.yaml
+```
 
 
 
@@ -589,7 +633,7 @@ $ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
 $ cat /opt/sonatype-work/nexus3/admin.password
 ```
 
-*** **From Nexus webpage** ***
+*** **From Nexus Webpage** ***
 
 Open Nexus: **http://<tools_public_ip>:8081**
 
@@ -630,7 +674,7 @@ Copy the admin user password
 $ sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
-*** **From Jenkins webpage** ***
+*** **From Jenkins Webpage** ***
 
 Open Jenkins webpage: **http://<tools_public_ip>:8080**
 
@@ -661,7 +705,7 @@ $ sudo systemctl stop jenkins
 $ sudo systemctl start jenkins
 ```
 
-*** **From Jenkins webpage** ***
+*** **From Jenkins Webpage** ***
 
 Configure the global credentials 'aws-creds' (from Section 1) & 'nexus-creds'(from Section 5, skip if chose to use ECR) from: **Settings -> Security -> Credentials -> System -> Global credentials (unrestricted) -> Add Credentials** 
 ![](images/Jenkins8.PNG)
@@ -679,7 +723,7 @@ GITHUB_REPO 'DevOps-Graduation-Project' (from Section 1)
 AWS_REGION 'us-east-1' (from Section 1)
 EKS_CLUSTER_NAME 'devops-gp-eks' (from Section 3)
 K8S_NAMESPACE 'devops'
-ECR_PUBLIC_URI (from Section 3, skip if chose to use Nexus)
+ECR_REPO_URL (from Section 3, skip if chose to use Nexus)
 NEXUS_HOST 'http://<tools_public_ip>:5000' (from Section 5, skip if chose to use ECR) 
 NEXUS_REGISTRY <tools_public_ip>:5000/repository/docker-hosted (from Section 5, skip if chose to use ECR) 
 ```

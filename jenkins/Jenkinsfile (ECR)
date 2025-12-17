@@ -3,7 +3,6 @@ pipeline {
 
   options {
     timestamps()
-    disableConcurrentBuilds()
     ansiColor('xterm')
   }
 
@@ -16,16 +15,18 @@ pipeline {
     AWS_REGION        = "${env.AWS_REGION}"
     EKS_CLUSTER_NAME  = "${env.EKS_CLUSTER_NAME}"
     K8S_NAMESPACE     = "${env.K8S_NAMESPACE}"
-    ECR_PUBLIC_URI    = "${env.ECR_PUBLIC_URI}"
+    REGISTRY_HOST     = "${env.REGISTRY_HOST}"
+    REGISTRY_REPO_URL = "${env.REGISTRY_REPO_URL}"
 
-    FRONTEND_TAG      = "${env.ECR_PUBLIC_URI}:frontend-${env.BUILD_NUMBER}"
-    BACKEND_TAG       = "${env.ECR_PUBLIC_URI}:backend-${env.BUILD_NUMBER}"
-    DB_TAG            = "${env.ECR_PUBLIC_URI}:postgres-15"
+    FRONTEND_TAG      = "${env.REGISTRY_REPO_URL}:frontend-${env.BUILD_NUMBER}"
+    BACKEND_TAG       = "${env.REGISTRY_REPO_URL}:backend-${env.BUILD_NUMBER}"
+    DB_TAG            = "${env.REGISTRY_REPO_URL}:postgres-15"
   }
 
   triggers { githubPush() }
 
   stages {
+
     stage('Checkout') {
       steps {
         git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
@@ -46,51 +47,88 @@ pipeline {
 
     stage('Docker login to ECR') {
       steps {
-        sh 'set -e; aws ecr-public get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin public.ecr.aws'
+        sh '''
+          set -e
+          aws ecr get-login-password --region "$AWS_REGION" \
+        | docker login --username AWS --password-stdin "$REGISTRY_HOST"
+        '''
       }
     }
 
     stage('Push DB image to ECR (one-time)') {
+      when {
+        changeset "app/database/**"
+      }
       steps {
         sh '''
           set -e
-          REPO_NAME=$(echo "$ECR_PUBLIC_URI" | cut -d/ -f3)
-          if aws ecr-public describe-images --repository-name "$REPO_NAME" \
-               --region "$AWS_REGION" \
-               --image-ids imageTag=postgres-15 >/dev/null 2>&1; then
-            echo "DB image already exists in ECR: $DB_TAG"
+          if docker pull "${DB_TAG}" >/dev/null 2>&1; then
+            echo "DB image already exists in ECR: ${DB_TAG}"
           else
-            echo "Pushing DB image to ECR for the first time"
+            echo "Pushing DB image to ECR for first time"
             docker pull postgres:15
-            docker tag postgres:15 "$DB_TAG"
-            docker push "$DB_TAG"
+            docker tag postgres:15 "${DB_TAG}"
+            docker push "${DB_TAG}"
           fi
         '''
       }
     }
 
-    stage('Build, tag & push frontend/backend') {
+    stage('Build, tag & push frontend') {
+      when {
+        changeset "app/frontend/**"
+      }
       steps {
         sh '''
           set -e
           docker build -t frontend:build ./app/frontend
-          docker build -t backend:build ./app/backend
-
           docker tag frontend:build "$FRONTEND_TAG"
-          docker tag backend:build "$BACKEND_TAG"
-
-          docker tag frontend:build "$ECR_PUBLIC_URI:frontend-latest"
-          docker tag backend:build "$ECR_PUBLIC_URI:backend-latest"
-
+          docker tag frontend:build "$REGISTRY_HOST:frontend-latest"
           docker push "$FRONTEND_TAG"
+          docker push "$REGISTRY_HOST:frontend-latest"
+        '''
+      }
+    }
+
+    stage('Build, tag & push backend') {
+      when {
+        changeset "app/backend/**"
+      }
+      steps {
+        sh '''
+          set -e
+          docker build -t backend:build ./app/backend
+          docker tag backend:build "$BACKEND_TAG"
+          docker tag backend:build "$REGISTRY_HOST:backend-latest"
           docker push "$BACKEND_TAG"
-          docker push "$ECR_PUBLIC_URI:frontend-latest"
-          docker push "$ECR_PUBLIC_URI:backend-latest"
+          docker push "$REGISTRY_HOST:backend-latest"
+        '''
+      }
+    }
+
+    stage('Create Secret in Kubernetes for ECR') {
+      steps {
+        sh '''
+          set -e
+          kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
+            --docker-server="${REGISTRY_HOST}" \
+            --docker-username=AWS \
+            --docker-password=$(aws ecr get-login-password --region "$AWS_REGION") \
+            --docker-email="a.e.n@gmail.com" \
+            --dry-run=client -o yaml | kubectl apply -f -
         '''
       }
     }
 
     stage('Deploy to Kubernetes') {
+      when {
+        anyOf {
+          changeset "k8s/**"
+          changeset "app/frontend/**"
+          changeset "app/backend/**"
+          changeset "app/database/**"
+        }
+      }
       steps {
         sh '''
           set -e
@@ -119,6 +157,13 @@ pipeline {
     }
     failure {
       echo 'Pipeline failed.'
+    }
+    always {
+      echo 'Cleanup'
+      sh '''
+        set -e
+        docker image prune -f
+      '''
     }
   }
 }

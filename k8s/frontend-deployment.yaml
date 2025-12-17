@@ -13,7 +13,7 @@ spec:
         app: frontend
     spec:
       imagePullSecrets: 
-        - name: nexus-secret
+      - name: cr-secret
       containers:
       - name: frontend
         image: ${FRONTEND_TAG} # frontend:latest
