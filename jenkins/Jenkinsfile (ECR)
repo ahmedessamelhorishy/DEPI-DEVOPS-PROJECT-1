@@ -7,9 +7,6 @@ pipeline {
   }
 
   environment {
-    AWS_ACCESS_KEY_ID     = credentials('aws-creds')
-    AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
-    
     GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
     GITHUB_REPO       = "${env.GITHUB_REPO}"
     AWS_REGION        = "${env.AWS_REGION}"
@@ -27,15 +24,6 @@ pipeline {
 
   stages {
 
-    stage('Example') {
-      steps {
-        sh '''
-          echo "AWS Access Key: $AWS_ACCESS_KEY_ID"
-          echo "AWS Secret Key: $AWS_SECRET_ACCESS_KEY"
-        '''
-      }
-    }
-
     stage('Checkout') {
       steps {
         git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
@@ -44,97 +32,104 @@ pipeline {
 
     stage('AWS EKS connect') {
       steps {
-        sh 'set -e; aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh 'aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
+        }
       }
     }
 
     stage('Create k8 namespace') {
       steps {
-        sh 'set -e; kubectl create ns "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -'
+        sh 'kubectl create ns "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -'
       }
     }
 
     stage('Docker login to ECR') {
       steps {
-        sh '''
-          set -e
-          aws ecr get-login-password --region "$AWS_REGION" \
-        | docker login --username AWS --password-stdin "$REGISTRY_HOST"
-        '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$REGISTRY_HOST"
+          '''
+        }
       }
     }
 
     stage('Push DB image to ECR (one-time)') {
       when {
-       anyOf {
-        changeset "app/database/**"
-        triggeredBy 'ManualTriggerCause'
-       }
+        anyOf {
+          changeset "app/database/**"
+          triggeredBy 'ManualTriggerCause'
+        }
       }
       steps {
-        sh '''
-          set -e
-          if docker pull "${DB_TAG}" >/dev/null 2>&1; then
-            echo "DB image already exists in ECR: ${DB_TAG}"
-          else
-            echo "Pushing DB image to ECR for first time"
-            docker pull postgres:15
-            docker tag postgres:15 "${DB_TAG}"
-            docker push "${DB_TAG}"
-          fi
-        '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            if docker pull "${DB_TAG}" >/dev/null 2>&1; then
+              echo "DB image already exists in ECR: ${DB_TAG}"
+            else
+              echo "Pushing DB image to ECR for first time"
+              docker pull postgres:15
+              docker tag postgres:15 "${DB_TAG}"
+              docker push "${DB_TAG}"
+            fi
+          '''
+        }
       }
     }
 
     stage('Build, tag & push frontend') {
       when {
-       anyOf {
-        changeset "app/frontend/**"
-        triggeredBy 'ManualTriggerCause'
-       }
+        anyOf {
+          changeset "app/frontend/**"
+          triggeredBy 'ManualTriggerCause'
+        }
       }
       steps {
-        sh '''
-          set -e
-          docker build -t frontend:build ./app/frontend
-          docker tag frontend:build "$FRONTEND_TAG"
-          docker tag frontend:build "$REGISTRY_HOST:frontend-latest"
-          docker push "$FRONTEND_TAG"
-          docker push "$REGISTRY_HOST:frontend-latest"
-        '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            docker build -t frontend:build ./app/frontend
+            docker tag frontend:build "$FRONTEND_TAG"
+            docker tag frontend:build "$REGISTRY_HOST:frontend-latest"
+            docker push "$FRONTEND_TAG"
+            docker push "$REGISTRY_HOST:frontend-latest"
+          '''
+        }
       }
     }
 
     stage('Build, tag & push backend') {
       when {
-       anyOf {
-        changeset "app/backend/**"
-        triggeredBy 'ManualTriggerCause'
-       }
+        anyOf {
+          changeset "app/backend/**"
+          triggeredBy 'ManualTriggerCause'
+        }
       }
       steps {
-        sh '''
-          set -e
-          docker build -t backend:build ./app/backend
-          docker tag backend:build "$BACKEND_TAG"
-          docker tag backend:build "$REGISTRY_HOST:backend-latest"
-          docker push "$BACKEND_TAG"
-          docker push "$REGISTRY_HOST:backend-latest"
-        '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            docker build -t backend:build ./app/backend
+            docker tag backend:build "$BACKEND_TAG"
+            docker tag backend:build "$REGISTRY_HOST:backend-latest"
+            docker push "$BACKEND_TAG"
+            docker push "$REGISTRY_HOST:backend-latest"
+          '''
+        }
       }
     }
 
     stage('Create Secret in Kubernetes for ECR') {
       steps {
-        sh '''
-          set -e
-          kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
-            --docker-server="${REGISTRY_HOST}" \
-            --docker-username=AWS \
-            --docker-password=$(aws ecr get-login-password --region "$AWS_REGION") \
-            --docker-email="ae@hotmail.com" \
-            --dry-run=client -o yaml | kubectl apply -f -
-        '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
+              --docker-server="${REGISTRY_HOST}" \
+              --docker-username=AWS \
+              --docker-password=$(aws ecr get-login-password --region "$AWS_REGION") \
+              --docker-email="ae@hotmail.com" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          '''
+        }
       }
     }
 
@@ -150,7 +145,6 @@ pipeline {
       }
       steps {
         sh '''
-          set -e
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
@@ -172,17 +166,20 @@ pipeline {
 
   post {
     success {
-      sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+      script {
+        try {
+          sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+        } catch (Exception e) {
+          echo "Frontend service not found yet."
+        }
+      }
     }
     failure {
       echo 'Pipeline failed.'
     }
     always {
       echo 'Cleanup'
-      sh '''
-        set -e
-        docker image prune -f
-      '''
+      sh 'docker image prune -f'
     }
   }
 }
