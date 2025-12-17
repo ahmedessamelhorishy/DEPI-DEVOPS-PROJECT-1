@@ -139,10 +139,24 @@ pipeline {
       }
     }
 
+    stage('Apply k8s infra') {
+      when {
+        changeset "k8s/**"
+      }
+      steps {
+        sh '''
+          set -e
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/frontend-service.yaml
+        '''
+      }
+    }
+
     stage('Deploy to Kubernetes') {
       when {
         anyOf {
-          changeset "k8s/**"
           changeset "app/frontend/**"
           changeset "app/backend/**"
           changeset "app/database/**"
@@ -153,11 +167,6 @@ pipeline {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             set -e
-            kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
-            kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
-            kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
-            kubectl -n "$K8S_NAMESPACE" apply -f k8s/frontend-service.yaml
-
             export FRONTEND_TAG BACKEND_TAG DB_TAG
 
             envsubst < k8s/db-deployment.yaml       | kubectl -n "$K8S_NAMESPACE" apply -f -
