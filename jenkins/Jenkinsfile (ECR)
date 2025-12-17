@@ -155,13 +155,15 @@ pipeline {
         }
       }
       steps {
-        sh '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
           set -e
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
           kubectl -n "$K8S_NAMESPACE" apply -f k8s/frontend-service.yaml
         '''
+        }
       }
     }
 
