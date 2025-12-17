@@ -12,8 +12,8 @@ pipeline {
   AWS_SECRET_ACCESS_KEY = "${AWS_CREDS_PSW}"
 
 
-    AWS_ACCESS_KEY_ID     = credentials('aws-creds')
-    AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
+    //AWS_ACCESS_KEY_ID     = credentials('aws-creds')
+   // AWS_SECRET_ACCESS_KEY = credentials('aws-creds')
 
     GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
     GITHUB_REPO       = "${env.GITHUB_REPO}"
