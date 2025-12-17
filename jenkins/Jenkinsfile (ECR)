@@ -94,9 +94,9 @@ pipeline {
             set -e
             docker build -t frontend:build ./app/frontend
             docker tag frontend:build "$FRONTEND_TAG"
-            docker tag frontend:build "$REGISTRY_HOST:frontend-latest"
+            docker tag frontend:build "$REGISTRY_REPO_URL:frontend-latest"
             docker push "$FRONTEND_TAG"
-            docker push "$REGISTRY_HOST:frontend-latest"
+            docker push "$REGISTRY_REPO_URL:frontend-latest"
           '''
         }
       }
