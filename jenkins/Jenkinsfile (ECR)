@@ -61,7 +61,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/database/**"
-          triggeredBy 'ManualTriggerCause'
+          triggeredBy 'UserIdCause'
         }
       }
       steps {
@@ -85,7 +85,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/frontend/**"
-          triggeredBy 'ManualTriggerCause'
+          triggeredBy 'UserIdCause'
         }
       }
       steps {
@@ -106,7 +106,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/backend/**"
-          triggeredBy 'ManualTriggerCause'
+          triggeredBy 'UserIdCause'
         }
       }
       steps {
@@ -146,7 +146,7 @@ pipeline {
           changeset "app/frontend/**"
           changeset "app/backend/**"
           changeset "app/database/**"
-          triggeredBy 'ManualTriggerCause'
+          triggeredBy 'UserIdCause'
         }
       }
       steps {
