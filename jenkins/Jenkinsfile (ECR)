@@ -51,7 +51,7 @@ pipeline {
           sh '''
             set -e
             aws ecr get-login-password --region "$AWS_REGION" \
-          | docker login --username AWS --password-stdin "$REGISTRY_HOST"
+              | docker login --username AWS --password-stdin "$REGISTRY_HOST"
           '''
         }
       }
@@ -164,19 +164,35 @@ pipeline {
         }
       }
       steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-          sh '''
-            set -e
-            export FRONTEND_TAG BACKEND_TAG DB_TAG
+        script {
+ 
+          def causes = currentBuild.rawBuild.getCauses()
+          def manualTrigger = causes.any { it.toString().contains("UserIdCause") }
 
-            envsubst < k8s/db-deployment.yaml       | kubectl -n "$K8S_NAMESPACE" apply -f -
-            envsubst < k8s/backend-deployment.yaml  | kubectl -n "$K8S_NAMESPACE" apply -f -
-            envsubst < k8s/frontend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
-
-            kubectl -n "$K8S_NAMESPACE" rollout status deployment/db --timeout=120s
-            kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend --timeout=120s
-            kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend --timeout=120s
-          '''
+          if (env.CHANGE_TARGET == "frontend" || manualTrigger) {
+            sh '''
+              set -e
+              export FRONTEND_TAG
+              envsubst < k8s/frontend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+              kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend --timeout=120s
+            '''
+          }
+          if (env.CHANGE_TARGET == "backend" || manualTrigger) {
+            sh '''
+              set -e
+              export BACKEND_TAG
+              envsubst < k8s/backend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+              kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend --timeout=120s
+            '''
+          }
+          if (env.CHANGE_TARGET == "database" || manualTrigger) {
+            sh '''
+              set -e
+              export DB_TAG
+              envsubst < k8s/db-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+              kubectl -n "$K8S_NAMESPACE" rollout status deployment/db --timeout=120s
+            '''
+          }
         }
       }
     }
@@ -184,15 +200,15 @@ pipeline {
 
   post {
     success {
-    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-      script {
-        try {
-          sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
-        } catch (Exception e) {
-          echo "Frontend service not found yet."
+      withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        script {
+          try {
+            sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+          } catch (Exception e) {
+            echo "Frontend service not found yet."
+          }
         }
       }
-    }
     }
     failure {
       echo 'Pipeline failed.'
