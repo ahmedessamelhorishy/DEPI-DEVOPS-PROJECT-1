@@ -1,6 +1,14 @@
 pipeline {
   agent any
 
+  parameters {
+    booleanParam(
+      name: 'DEPLOY_MANUAL',
+      defaultValue: false,
+      description: 'Check this to force a manual deployment'
+    )
+  }
+
   options {
     timestamps()
     ansiColor('xterm')
@@ -61,7 +69,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/database/**"
-          triggeredBy 'UserIdCause'
+          expression { params.DEPLOY_MANUAL }
         }
       }
       steps {
@@ -85,7 +93,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/frontend/**"
-          triggeredBy 'UserIdCause'
+          expression { params.DEPLOY_MANUAL }
         }
       }
       steps {
@@ -106,7 +114,7 @@ pipeline {
       when {
         anyOf {
           changeset "app/backend/**"
-          triggeredBy 'UserIdCause'
+          expression { params.DEPLOY_MANUAL }
         }
       }
       steps {
@@ -141,7 +149,10 @@ pipeline {
 
     stage('Apply k8s infra') {
       when {
-        changeset "k8s/**"
+        anyOf {
+          changeset "k8s/**"
+          expression { params.DEPLOY_MANUAL }
+        }
       }
       steps {
         sh '''
@@ -160,13 +171,12 @@ pipeline {
           changeset "app/frontend/**"
           changeset "app/backend/**"
           changeset "app/database/**"
-          triggeredBy 'UserIdCause'
+          expression { params.DEPLOY_MANUAL }
         }
       }
       steps {
         script {
- 
-          if (env.CHANGE_TARGET == "frontend") {
+          if (env.CHANGE_TARGET == "frontend" || params.DEPLOY_MANUAL) {
             sh '''
               set -e
               export FRONTEND_TAG
@@ -174,7 +184,7 @@ pipeline {
               kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend --timeout=120s
             '''
           }
-          if (env.CHANGE_TARGET == "backend") {
+          if (env.CHANGE_TARGET == "backend" || params.DEPLOY_MANUAL) {
             sh '''
               set -e
               export BACKEND_TAG
@@ -182,7 +192,7 @@ pipeline {
               kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend --timeout=120s
             '''
           }
-          if (env.CHANGE_TARGET == "database") {
+          if (env.CHANGE_TARGET == "database" || params.DEPLOY_MANUAL) {
             sh '''
               set -e
               export DB_TAG
