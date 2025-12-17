@@ -185,8 +185,12 @@ pipeline {
   post {
     success {
       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+    try {
         sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
-      }
+    } catch (Exception e) {
+        echo "Frontend service not found yet."
+    }
+       }
     }
     failure {
       echo 'Pipeline failed.'
