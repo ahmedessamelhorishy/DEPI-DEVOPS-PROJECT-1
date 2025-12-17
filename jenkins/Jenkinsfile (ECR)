@@ -115,9 +115,9 @@ pipeline {
             set -e
             docker build -t backend:build ./app/backend
             docker tag backend:build "$BACKEND_TAG"
-            docker tag backend:build "$REGISTRY_HOST:backend-latest"
+            docker tag backend:build "$REGISTRY_REPO_URL:backend-latest"
             docker push "$BACKEND_TAG"
-            docker push "$REGISTRY_HOST:backend-latest"
+            docker push "$REGISTRY_REPO_URL:backend-latest"
           '''
         }
       }
