@@ -58,6 +58,7 @@ pipeline {
     stage('Push DB image to ECR (one-time)') {
       when {
         changeset "app/database/**"
+        triggeredBy 'ManualTriggerCause'
       }
       steps {
         sh '''
@@ -77,6 +78,7 @@ pipeline {
     stage('Build, tag & push frontend') {
       when {
         changeset "app/frontend/**"
+        triggeredBy 'ManualTriggerCause'
       }
       steps {
         sh '''
@@ -93,6 +95,7 @@ pipeline {
     stage('Build, tag & push backend') {
       when {
         changeset "app/backend/**"
+        triggeredBy 'ManualTriggerCause'
       }
       steps {
         sh '''
@@ -114,7 +117,7 @@ pipeline {
             --docker-server="${REGISTRY_HOST}" \
             --docker-username=AWS \
             --docker-password=$(aws ecr get-login-password --region "$AWS_REGION") \
-            --docker-email="a.e.n@gmail.com" \
+            --docker-email="ae@hotmail.com" \
             --dry-run=client -o yaml | kubectl apply -f -
         '''
       }
@@ -127,6 +130,7 @@ pipeline {
           changeset "app/frontend/**"
           changeset "app/backend/**"
           changeset "app/database/**"
+          triggeredBy 'ManualTriggerCause'
         }
       }
       steps {

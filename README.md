@@ -500,7 +500,14 @@ $ aws eks update-kubeconfig --name $(terraform output -raw eks_cluster_name) --r
 $ kubectl config get-contexts
 $ kubectl get nodes
 $ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
-```
+```  
+
+![](images/EC2.PNG)
+![](images/ECR.PNG)
+![](images/EKS.PNG)
+![](images/VPC1.PNG)
+![](images/VPC2.PNG)
+![](images/VPC3.PNG)  
 
 Cleanup
 ```bash
@@ -671,6 +678,8 @@ Create user 'nexus' with role 'nx-admin' from: **Settings -> Security -> Users -
 
 Copy the admin user password
 ```bash
+$ cd ~/devops/infra/terraform
+$ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
 $ sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
@@ -687,10 +696,10 @@ Install suggested plugins
 Create the admin user
 ![](images/Jenkins3.PNG)
 
-Set the Jenkins URL to: **http://<tools_public_ip>:8080**
+Set the Jenkins URL to: **http://<tools_public_ip>:8080/**
 ![](images/Jenkins4.PNG)
 
-Install the plugins 'AWS credentials' & 'AnsiColor' from: **Settings -> System Configuration -> Plugins -> Install** 
+Install the plugins 'AWS credentials' & 'AnsiColor' from: **Settings -> System Configuration -> Plugins -> Available Plugins -> Install** 
 ![](images/Jenkins5.PNG)
 ![](images/Jenkins6.PNG)
 ![](images/Jenkins7.PNG)
@@ -699,8 +708,6 @@ Install the plugins 'AWS credentials' & 'AnsiColor' from: **Settings -> System C
 
 Restart Jenkins
 ```bash
-$ cd ~/devops/infra/terraform
-$ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
 $ sudo systemctl stop jenkins
 $ sudo systemctl start jenkins
 ```
