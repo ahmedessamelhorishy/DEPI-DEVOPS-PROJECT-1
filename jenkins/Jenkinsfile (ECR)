@@ -166,10 +166,7 @@ pipeline {
       steps {
         script {
  
-          def causes = currentBuild.rawBuild.getCauses()
-          def manualTrigger = causes.any { it.toString().contains("UserIdCause") }
-
-          if (env.CHANGE_TARGET == "frontend" || manualTrigger) {
+          if (env.CHANGE_TARGET == "frontend") {
             sh '''
               set -e
               export FRONTEND_TAG
@@ -177,7 +174,7 @@ pipeline {
               kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend --timeout=120s
             '''
           }
-          if (env.CHANGE_TARGET == "backend" || manualTrigger) {
+          if (env.CHANGE_TARGET == "backend") {
             sh '''
               set -e
               export BACKEND_TAG
@@ -185,7 +182,7 @@ pipeline {
               kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend --timeout=120s
             '''
           }
-          if (env.CHANGE_TARGET == "database" || manualTrigger) {
+          if (env.CHANGE_TARGET == "database") {
             sh '''
               set -e
               export DB_TAG
