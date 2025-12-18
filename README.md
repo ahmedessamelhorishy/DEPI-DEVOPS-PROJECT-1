@@ -605,6 +605,8 @@ $ ansible-playbook -i inventory.ini uninstall.yaml
 
 a- Allow Nexus as insecure registry in the Docker daemon configuration on the AWS EC2 instance
 ```bash
+$ cd ~/devops/infra/terraform
+$ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
 $ sudo vi /etc/docker/daemon.json
 ```
 ```
@@ -741,14 +743,13 @@ GITHUB_REPO 'DevOps-Graduation-Project' (from Section 1)
 AWS_REGION 'us-east-1' (from Section 1)
 EKS_CLUSTER_NAME 'devops-gp-eks' (from Section 3)
 K8S_NAMESPACE 'devops'
-ECR_REPO_URL (from Section 3, skip if chose to use Nexus)
-NEXUS_HOST 'http://<tools_public_ip>:5000' (from Section 5, skip if chose to use ECR) 
-NEXUS_REGISTRY <tools_public_ip>:5000/repository/docker-hosted (from Section 5, skip if chose to use ECR) 
+REGISTRY_HOST 'http://<tools_public_ip>:5000' (from Section 5 if chose to use **Nexus**) OR '729127835587.dkr.ecr.us-east-1.amazonaws.com' (from Section 3 if chose to use **ECR**)
+REGISTRY_REPO_URL <tools_public_ip>:5000/repository/docker-hosted (from Section 5 if chose to use **Nexus**) OR '729127835587.dkr.ecr.us-east-1.amazonaws.com/devops-gp-repo' (from Section 3 if chose to use **ECR**)
 ```
 ![](images/Jenkins15.PNG)
 ![](images/Jenkins16.PNG)
 
-Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile' (if chose to use **Nexus**) OR 'jenkins/Jenkinsfile (ECR)' (if chose to use **ECR**)  from: **New Item**
+Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile (Nexus)' (if chose to use **Nexus**) OR 'jenkins/Jenkinsfile (ECR)' (if chose to use **ECR**)  from: **New Item**
 ![](images/Jenkins17.PNG)
 ![](images/Jenkins18.PNG)
 ![](images/Jenkins19.PNG)

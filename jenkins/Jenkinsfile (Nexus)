@@ -1,0 +1,237 @@
+pipeline {
+  agent any
+
+  parameters {
+    booleanParam(
+      name: 'DEPLOY_MANUAL',
+      defaultValue: false,
+      description: 'Select to run a manual build'
+    )
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  environment {
+    GITHUB_USERNAME   = "${env.GITHUB_USERNAME}"
+    GITHUB_REPO       = "${env.GITHUB_REPO}"
+    AWS_REGION        = "${env.AWS_REGION}"
+    EKS_CLUSTER_NAME  = "${env.EKS_CLUSTER_NAME}"
+    K8S_NAMESPACE     = "${env.K8S_NAMESPACE}"
+    REGISTRY_HOST     = "${env.REGISTRY_HOST}"
+    REGISTRY_REPO_URL = "${env.REGISTRY_REPO_URL}"
+	
+    NEXUS_CREDS       = credentials('nexus-creds')
+
+    FRONTEND_TAG      = "${env.REGISTRY_REPO_URL}:frontend-${env.BUILD_NUMBER}"
+    BACKEND_TAG       = "${env.REGISTRY_REPO_URL}:backend-${env.BUILD_NUMBER}"
+    DB_TAG            = "${env.REGISTRY_REPO_URL}:postgres-15"
+  }
+
+  triggers { githubPush() }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: 'main', url: "https://github.com/${env.GITHUB_USERNAME}/${env.GITHUB_REPO}.git"
+      }
+    }
+
+    stage('AWS EKS connect') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh 'set -e; aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"'
+        }
+      }
+    }
+
+    stage('Create k8 namespace') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh 'set -e; kubectl create ns "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -'
+        }
+      }
+    }
+
+    stage('Docker login to Nexus') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            set -e
+            echo "$NEXUS_CREDS_PSW" \
+              | docker login --username "$NEXUS_CREDS_USR" --password-stdin $REGISTRY_HOST"
+          '''
+        }
+      }
+    }
+
+    stage('Push DB image to Nexus (one-time)') {
+      when {
+        anyOf {
+          changeset "app/database/**"
+          expression { params.DEPLOY_MANUAL }
+        }
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            set -e
+            if docker pull "${DB_TAG}" >/dev/null 2>&1; then
+              echo "DB image already exists in Nexus: ${DB_TAG}"
+            else
+              echo "Pushing DB image to Nexus for first time"
+              docker pull postgres:15
+              docker tag postgres:15 "${DB_TAG}"
+              docker push "${DB_TAG}"
+            fi
+          '''
+        }
+      }
+    }
+
+    stage('Build, tag & push frontend') {
+      when {
+        anyOf {
+          changeset "app/frontend/**"
+          expression { params.DEPLOY_MANUAL }
+        }
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            set -e
+            docker build -t frontend:build ./app/frontend
+            docker tag frontend:build "$FRONTEND_TAG"
+            docker tag frontend:build "$REGISTRY_REPO_URL:frontend-latest"
+            docker push "$FRONTEND_TAG"
+            docker push "$REGISTRY_REPO_URL:frontend-latest"
+          '''
+        }
+      }
+    }
+
+    stage('Build, tag & push backend') {
+      when {
+        anyOf {
+          changeset "app/backend/**"
+          expression { params.DEPLOY_MANUAL }
+        }
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            set -e
+            docker build -t backend:build ./app/backend
+            docker tag backend:build "$BACKEND_TAG"
+            docker tag backend:build "$REGISTRY_REPO_URL:backend-latest"
+            docker push "$BACKEND_TAG"
+            docker push "$REGISTRY_REPO_URL:backend-latest"
+          '''
+        }
+      }
+    }
+
+    stage('Create Secret in Kubernetes for Nexus') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            set -e
+            kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
+              --docker-server="${REGISTRY_HOST}" \
+              --docker-username="${NEXUS_CREDS_USR}" \
+              --docker-password=${NEXUS_CREDS_PSW}" \
+              --docker-email="ae@hotmail.com" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          '''
+        }
+      }
+    }
+
+    stage('Apply k8s infra') {
+      when {
+        anyOf {
+          changeset "k8s/**"
+          expression { params.DEPLOY_MANUAL }
+        }
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+          set -e
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-configmap.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/db-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/backend-service.yaml
+          kubectl -n "$K8S_NAMESPACE" apply -f k8s/frontend-service.yaml
+        '''
+        }
+      }
+    }
+
+    stage('Deploy to Kubernetes') {
+      when {
+        anyOf {
+          changeset "app/frontend/**"
+          changeset "app/backend/**"
+          changeset "app/database/**"
+          expression { params.DEPLOY_MANUAL }
+        }
+      }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          script {
+            if (env.CHANGE_TARGET == "frontend" || params.DEPLOY_MANUAL) {
+              sh '''
+                set -e
+                export FRONTEND_TAG
+                envsubst < k8s/frontend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+                kubectl -n "$K8S_NAMESPACE" rollout status deployment/frontend --timeout=120s
+              '''
+            }
+            if (env.CHANGE_TARGET == "backend" || params.DEPLOY_MANUAL) {
+              sh '''
+                set -e
+                export BACKEND_TAG
+                envsubst < k8s/backend-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+                kubectl -n "$K8S_NAMESPACE" rollout status deployment/backend --timeout=120s
+              '''
+            }
+            if (env.CHANGE_TARGET == "database" || params.DEPLOY_MANUAL) {
+              sh '''
+                set -e
+                export DB_TAG
+                envsubst < k8s/db-deployment.yaml | kubectl -n "$K8S_NAMESPACE" apply -f -
+                kubectl -n "$K8S_NAMESPACE" rollout status deployment/db --timeout=120s
+              '''
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        script {
+          try {
+            sh 'kubectl -n "$K8S_NAMESPACE" get svc frontend -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"'
+          } catch (Exception e) {
+            echo "Frontend service not found yet."
+          }
+        }
+      }
+    }
+    failure {
+      echo 'Pipeline failed.'
+    }
+    always {
+      echo 'Cleanup'
+      sh '''
+        set -e
+        docker image prune -f
+      '''
+    }
+  }
+}
