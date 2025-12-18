@@ -1,15 +1,18 @@
-# DEPI DevOps Project on AWS with CI/CD
+# DEPI DevOps Project for Three-Tier Application on AWS with CI/CD
 
 ## Index
 
-- [Tools & Code Files Structure Preparation](#1--tools--code-files-structure-preparation)
-- [Local Development & Testing](#2--local-development--testing)
-- [Terraform](#3--terraform)
-- [Ansible](#4--ansible)
-- [Nexus (Skip if chose to use ECR)](#5--nexus-skip-if-chose-to-use-ecr)
-- [Jenkins](#6--jenkins)
+- [System Architecture Overview](#1--system-architecture-overview)
+- [Project Code Files Tree Structure](#2--project-code-files-tree-structure)
+- [Tools & Code Files Structure Preparation](#3--tools--code-files-structure-preparation)
+- [Local Development & Testing](#4--local-development--testing)
+- [Terraform](#5--terraform)
+- [Ansible](#6--ansible)
+- [Nexus (Skip if chose to use ECR)](#7--nexus-skip-if-chose-to-use-ecr)
+- [Jenkins](#8--jenkins)  
 
-## Architecture Overview
+
+## 1- System Architecture Overview
 
 This project implements a **DevOps pipeline on AWS** using:
 
@@ -19,9 +22,14 @@ This project implements a **DevOps pipeline on AWS** using:
 - **Nexus / ECR** → Container registry for storing Docker images.
 - **Terraform** → Infrastructure provisioning (**EC2, ECR, EKS & VPC**).
 - **Ansible** → Configuration management and automation (installing **Nexus & Jenkins**).
-- **Jenkins** → CI/CD pipeline automation.
+- **Jenkins** → CI/CD pipeline automation.  
 
-## Project Code Files Structure:
+![](images/Application.PNG)
+![](images/Architecture1.PNG)
+![](images/Architecture2.PNG)
+
+
+## 2- Project Code Files Tree Structure:
 
 ```
 ansible
@@ -89,13 +97,14 @@ k8s/
   frontend-deployment.yaml
   frontend-service.yaml
 docker-compose.yml
-```
+```  
 
-## 1- Tools & Code Files Structure Preparation:
+
+## 3- Tools & Code Files Structure Preparation:
 
 Local environment requirements: **WSL with Ubuntu OS + Docker Desktop (with Kubernetes enabled).**
 
-Tools/Apps requirements: **Git + Docker + Docker Compose + Kubectl + AWS CLI + Terraform + Ansible.**
+Tools/Application requirements: **Git + Docker + Docker Compose + Kubectl + AWS CLI + Terraform + Ansible.**
 
 ### Steps:
 
@@ -136,9 +145,9 @@ Copy the public key content
 $ cat ~/.ssh/id_ed25519.pub  
 ```
 
-*** **From GitHub UI** ***
+*** **From GitHub Webpage** ***
 
-Paste the key to the GitHub account under: **Settings → SSH and GPG keys -> New SSH key**  
+Paste the key to the GitHub account under: **Account Settings → SSH and GPG keys -> New SSH key**  
 ![](images/GitHub1.PNG)
 
 Create GitHub public repository 'DevOps-Graduation-Project'
@@ -249,7 +258,7 @@ $ git push -u origin main
 ```
 
 
-## 2- Local Development & Testing:
+## 4- Local Development & Testing:
 
 *Local testing using **Docker***
 
@@ -348,7 +357,7 @@ $ docker ps
 
 *** **From Any Browser** ***
 
-Open the app frontend: **http://localhost:3000** 
+Open the application frontend webpage: **http://localhost:3000** 
 
 Cleanup  
 ```bash
@@ -407,7 +416,7 @@ $ kubectl get all -n devops
 
 *** **From Any Browser** ***
 
-Open the app frontend: **http://localhost:3000**
+Open the application frontend webpage: **http://localhost:3000**
 
 
 Cleanup
@@ -420,7 +429,7 @@ $ docker rmi postgres:15
 ```
 
 
-## 3- Terraform:
+## 5- Terraform:
 
 *Configuring: **AWS EC2** instance + **ECR** private repository + **EKS** cluster + **VPC** services*
 
@@ -500,7 +509,9 @@ $ aws eks update-kubeconfig --name $(terraform output -raw eks_cluster_name) --r
 $ kubectl config get-contexts
 $ kubectl get nodes
 $ ssh -i ~/.ssh/id_ed25519 ubuntu@$(terraform output -raw tools_public_ip)
-```  
+```   
+
+*** **From AWS Webpage** ***
 
 ![](images/EC2.PNG)
 ![](images/ECR.PNG)
@@ -523,9 +534,9 @@ $ cp ~/.kube/config.bak ~/.kube/config
 
 
 
-## 4- Ansible:
+## 6- Ansible:
 
-*Configuring: **Docker** + **AWS CLI** + **Kubectl** + **Jenkins** + **Nexus** tools/apps on **AWS EC2** instance*
+*Configuring: **Docker** + **AWS CLI** + **Kubectl** + **Jenkins** + **Nexus** tools/application on **AWS EC2** instance*
 
 ***Notes:*** 
 
@@ -588,7 +599,7 @@ $ ansible-playbook -i inventory.ini uninstall.yaml
 
 
 
-## 5- Nexus (Skip if chose to use ECR):
+## 7- Nexus (Skip if chose to use ECR):
 
 ***Notes:***
 
@@ -668,7 +679,7 @@ Create user 'nexus' with role 'nx-admin' from: **Settings -> Security -> Users -
 
 
 
-## 6- Jenkins
+## 8- Jenkins
 
 *Installing & configuring **Jenkins** user, plugins, global credentials, global environment variables & pipeline*
 
@@ -743,3 +754,43 @@ Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Defi
 ![](images/Jenkins19.PNG)
 ![](images/Jenkins20.PNG)
 ![](images/Jenkins21.PNG)
+
+Test the pipeline build manually from: **Pipeline -> Build with Parameters -> Set DEPLOY_MANUAL -> Build**
+![](images/Jenkins22.PNG)
+![](images/Jenkins23.PNG)
+![](images/Jenkins24.PNG)  
+
+*** **From GitHub Webpage** ***
+
+Configure the GitHub Webhook by seting Payload URL to 'http://<tools_public_ip>:8080/github-webhook/', Content type 'application/json' & Disable SSL verification from: **Repository Settings -> Code and automation -> Webhooks -> Add webhook**
+![](images/Jenkins25.PNG)
+![](images/Jenkins26.PNG)
+![](images/Jenkins27.PNG)  
+
+*** **From WSL Terminal** ***
+
+Test the pipeline build automation by doing any change in one of the application code files then stage, commit & push it to GitHub repository 
+```bash
+$ git add .  
+$ git commit -m "adjust server.js for testing pipeline automation"  
+$ git push -u origin main  
+```  
+
+*** **From Jenkins Webpage** ***
+
+Verify
+![](images/Jenkins28.PNG)
+![](images/Jenkins29.PNG)
+
+Copy the load balancer DNS name from: Pipeline -> Build -> Console Output
+![](images/Jenkins30.PNG)  
+
+*** **From AWS Webpage** ***
+
+Verify
+![](images/Jenkins31.PNG)  
+
+*** **From Any Browser** ***
+
+Paste the load balancer DNS name followed by port 3000 to open the application frontend webpage:
+![](images/Jenkins32.PNG)
