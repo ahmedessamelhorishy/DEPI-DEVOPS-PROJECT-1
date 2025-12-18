@@ -61,7 +61,7 @@ pipeline {
           sh '''
             set -e
             echo "$NEXUS_CREDS_PSW" \
-              | docker login --username "$NEXUS_CREDS_USR" --password-stdin $REGISTRY_HOST"
+              | docker login --username "$NEXUS_CREDS_USR" --password-stdin "$REGISTRY_HOST"
           '''
         }
       }
