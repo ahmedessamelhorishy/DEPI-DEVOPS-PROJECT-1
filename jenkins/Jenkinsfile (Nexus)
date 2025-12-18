@@ -141,7 +141,7 @@ pipeline {
             kubectl -n "$K8S_NAMESPACE" create secret docker-registry cr-secret \
               --docker-server="${REGISTRY_HOST}" \
               --docker-username="${NEXUS_CREDS_USR}" \
-              --docker-password=${NEXUS_CREDS_PSW}" \
+              --docker-password="${NEXUS_CREDS_PSW}" \
               --docker-email="ae@hotmail.com" \
               --dry-run=client -o yaml | kubectl apply -f -
           '''
