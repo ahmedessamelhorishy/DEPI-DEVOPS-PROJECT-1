@@ -150,7 +150,7 @@ $ cat ~/.ssh/id_ed25519.pub
 Paste the key to the GitHub account under: **Account Settings → SSH and GPG keys -> New SSH key**  
 ![](images/GitHub1.PNG)
 
-Create GitHub public repository 'DevOps-Graduation-Project'
+Create GitHub public repository 'DEPI-DEVOPS-PROJECT-1'
 
 *** **From WSL Terminal** ***
 
@@ -242,7 +242,7 @@ $ mkdir -p jenkins
 $ mkdir -p k8s  
 
 $ git init  
-$ git remote add origin git@github.com:ahmedessamelhorishy/DevOps-Graduation-Project.git  
+$ git remote add origin git@github.com:ahmedessamelhorishy/DEPI-DEVOPS-PROJECT-1.git  
 ```
 
 Verify  
@@ -739,7 +739,7 @@ Configure the global credentials 'aws-creds' (from Section 1) & 'nexus-creds'(fr
 Configure the below global environment variables from: **Settings -> System Configuration -> Global properties -> Environment variables**
 ```
 GITHUB_USERNAME 'ahmedessamelhorishy' (from Section 1)
-GITHUB_REPO 'DevOps-Graduation-Project' (from Section 1)
+GITHUB_REPO 'DEPI-DEVOPS-PROJECT-1' (from Section 1)
 AWS_REGION 'us-east-1' (from Section 1)
 EKS_CLUSTER_NAME 'devops-gp-eks' (from Section 3)
 K8S_NAMESPACE 'devops'
@@ -749,7 +749,7 @@ REGISTRY_REPO_URL <tools_public_ip>:5000/repository/docker-hosted (from Section 
 ![](images/Jenkins15.PNG)
 ![](images/Jenkins16.PNG)
 
-Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DevOps-Graduation-Project', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile (Nexus)' (if chose to use **Nexus**) OR 'jenkins/Jenkinsfile (ECR)' (if chose to use **ECR**)  from: **New Item**
+Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Definition, Git SCM, Repository URL 'github.com:ahmedessamelhorishy/DEPI-DEVOPS-PROJECT-1', Branch specifier '*/main' & Script path 'jenkins/Jenkinsfile (Nexus)' (if chose to use **Nexus**) OR 'jenkins/Jenkinsfile (ECR)' (if chose to use **ECR**)  from: **New Item**
 ![](images/Jenkins17.PNG)
 ![](images/Jenkins18.PNG)
 ![](images/Jenkins19.PNG)
