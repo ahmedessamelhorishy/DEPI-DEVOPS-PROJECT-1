@@ -758,15 +758,31 @@ Create the pipeline with item name 'Pipeline', set Pipeline script from SCM Defi
 
 Test the pipeline build manually from: **Pipeline -> Build with Parameters -> Set DEPLOY_MANUAL -> Build**
 ![](images/Jenkins22.PNG)
-![](images/Jenkins23.PNG)
+![](images/Jenkins23.PNG)  
+
+Verify
 ![](images/Jenkins24.PNG)  
+![](images/Jenkins25.PNG)
+
+Copy the load balancer DNS name from: Pipeline -> Build -> Console Output
+![](images/Jenkins26.PNG)  
+
+*** **From AWS Webpage** ***
+
+Verify (if chose to use **Nexus**)
+![](images/Jenkins27.PNG)  
+
+*** **From Any Browser** ***
+
+Paste the load balancer DNS name followed by port 3000 to open the application frontend webpage:
+![](images/Jenkins28.PNG)
 
 *** **From GitHub Webpage** ***
 
 Configure the GitHub Webhook by seting Payload URL to 'http://<tools_public_ip>:8080/github-webhook/', Content type 'application/json' & Disable SSL verification from: **Repository Settings -> Code and automation -> Webhooks -> Add webhook**
-![](images/Jenkins25.PNG)
-![](images/Jenkins26.PNG)
-![](images/Jenkins27.PNG)  
+![](images/Jenkins29.PNG)
+![](images/Jenkins30.PNG)
+![](images/Jenkins31.PNG)  
 
 *** **From WSL Terminal** ***
 
@@ -780,18 +796,18 @@ $ git push -u origin main
 *** **From Jenkins Webpage** ***
 
 Verify
-![](images/Jenkins28.PNG)
-![](images/Jenkins29.PNG)
+![](images/Jenkins32.PNG)
+![](images/Jenkins33.PNG)
 
 Copy the load balancer DNS name from: Pipeline -> Build -> Console Output
-![](images/Jenkins30.PNG)  
+![](images/Jenkins34.PNG)  
 
 *** **From AWS Webpage** ***
 
-Verify
-![](images/Jenkins31.PNG)  
+Verify (if chose to use **ECR**)
+![](images/Jenkins35.PNG)  
 
 *** **From Any Browser** ***
 
 Paste the load balancer DNS name followed by port 3000 to open the application frontend webpage:
-![](images/Jenkins32.PNG)
+![](images/Jenkins36.PNG)
